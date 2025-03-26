@@ -1,0 +1,28 @@
+﻿@model IEnumerable<MoscowWeatherData>
+
+<h2>Импорт данных</h2>
+
+<form asp-action="Upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button type="submit" class="btn btn-primary">Загрузить Excel</button>
+</form>
+
+<table class="table mt-3">
+    <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Время (МСК)</th>
+            <th>Температура</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.Date.ToString("dd.MM.yyyy")</td>
+                <td>@item.MoscowTime.ToString(@"hh\:mm")</td>
+                <td>@item.T.ToString("F1") °C</td>
+            </tr>
+        }
+    </tbody>
+</table>
