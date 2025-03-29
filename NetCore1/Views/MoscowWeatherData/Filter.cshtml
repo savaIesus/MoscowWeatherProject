@@ -1,0 +1,89 @@
+﻿@model NetCore1.Models.PaginatedArchieveViewModel
+
+<h2>Фильтрованные метеоданные Москвы</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <h4>Фильтр по годам:</h4>
+        <a asp-action="Filter"
+           asp-route-Year="0"
+           asp-route-Month="@Model.Filter.Month"
+           class="btn btn-outline-primary m-1">
+            Все года
+        </a>
+        @foreach (var year in Model.Years)
+        {
+            <a asp-action="Filter"
+               asp-route-Year="@year"
+               asp-route-Month="@Model.Filter.Month"
+               class="btn @(Model.Filter.Year == year ? "active-filter" : "btn-outline-primary") m-1">
+                @year
+            </a>
+        }
+    </div>
+
+    <div class="col-md-6">
+        <h4>Фильтр по месяцам:</h4>
+        <a asp-action="Filter"
+           asp-route-Year="@Model.Filter.Year"
+           asp-route-Month="0"
+           class="btn btn-outline-primary m-1">
+            Все месяцы
+        </a>
+        @for (int i = 1; i <= 12; i++)
+        {
+            <a asp-action="Filter"
+               asp-route-Year="@Model.Filter.Year"
+               asp-route-Month="@i"
+               class="btn @(Model.Filter.Month == i ? "active-filter" : "btn-outline-primary") m-1">
+                @Model.Months[i - 1]
+            </a>
+        }
+    </div>
+</div>
+
+@if (Model.Data.Count == 0)
+{
+    <div class="alert alert-info">
+        <h4>Нет данных для отображения</h4>
+        <p>Выберите год и месяц для фильтрации</p>
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Температура</th>
+                <th>Влажность</th>
+                <th>Точка росы</th>
+                <th>Давление</th>
+                <th>Ветер</th>
+                <th>Облачность, %</th>
+                <th>Нижняя граница облачности, м</th>
+                <th>Горизонтальная видимость, км</th>
+                <th>Погодные явления</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Data)
+            {
+                <tr>
+                    <td>@item.Date.ToString("dd.MM.yyyy")</td>
+                    <td>@item.MoscowTime.ToString(@"hh\:mm")</td>
+                    <td>@item.Temperature.ToString("F1") °C</td>
+                    <td>@item.Humidity.ToString("F1")%</td>
+                    <td>@item.DewPoint.ToString("F1") °C</td>
+                    <td>@item.Pressure мм рт.ст.</td>
+                    <td>@item.WindDirection @item.WindSpeed м/с</td>
+                    <td>@item.Cloudiness</td>
+                    <td>@item.H.ToString("F1")</td>
+                    <td>@item.VV</td>
+                    <td>@item.WeatherPhenomena</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

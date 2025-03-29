@@ -13,8 +13,7 @@ namespace NetCore1.Services
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<MoscowWeatherData>()
-                .Property(m => m.Date)
-                .HasColumnType("date");
+                .HasKey(k => new { k.Date, k.MoscowTime });
         }
     }
 }
