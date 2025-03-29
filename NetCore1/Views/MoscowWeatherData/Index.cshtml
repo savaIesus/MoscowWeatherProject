@@ -2,9 +2,10 @@
 
 <h2>Метеоданные Москвы</h2>
 
+<!-- Форма для загрузки Excel файлов -->
 <form asp-action="Upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="files" multiple accept=".xlsx" required> 
+    <!-- Элемент для выбора файлов (множественный выбор, только .xlsx) -->
+    <input type="file" name="files" multiple accept=".xlsx" required>
+    <!-- Кнопка для отправки формы -->
     <button type="submit" class="btn btn-primary">Импорт Excel</button>
 </form>
-
-

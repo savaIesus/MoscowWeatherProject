@@ -1,23 +1,31 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NetCore1.Models;
+using Npgsql;
 using NetCore1.Services;
-using System.Collections.Generic;
+
+
 
 namespace NetCore1.Controllers
 {
+    // Контроллер для обработки данных о погоде в Москве
     public class MoscowWeatherDataController : Controller
     {
         private readonly AppDbContext _context; // Контекст базы данных для работы с данными
         private readonly ExcelImporter _importer; // Сервис для импорта данных из Excel
+        private readonly ILogger<MoscowWeatherDataController> _logger; // Логгер для записи информации о работе контроллера
 
         // Конструктор контроллера, принимает зависимости через DI (Dependency Injection)
-        public MoscowWeatherDataController(AppDbContext context, ExcelImporter importer)
+        public MoscowWeatherDataController(AppDbContext context, ExcelImporter importer, ILogger<MoscowWeatherDataController> logger)
         {
             _context = context; // Инициализация контекста базы данных
             _importer = importer; // Инициализация сервиса импорта данных
+            _logger = logger; // Инициализация логгера
         }
 
+        /// <summary>
         /// Метод для загрузки файлов Excel и сохранения данных в базу данных.
+        /// </summary>
         /// <param name="files">Массив загруженных файлов</param>
         /// <returns>Результат HTTP-ответа</returns>
         [HttpPost]
@@ -25,38 +33,91 @@ namespace NetCore1.Controllers
         {
             // Проверяем, что файлы были выбраны
             if (files == null || files.Length == 0)
+            {
                 return BadRequest("Файлы не выбраны.");
+            }
 
-            var allData = new List<MoscowWeatherData>(); // Список для хранения всех импортированных данных
+            var errorMessages = new List<string>(); // Список для хранения сообщений об ошибках
 
             foreach (var file in files)
             {
                 if (file.Length == 0) continue; // Пропускаем пустые файлы
 
-                // Создаем временный файл для обработки
-                var tempFile = Path.GetTempFileName();
-                using (var stream = new FileStream(tempFile, FileMode.Create))
+                var tempFile = Path.GetTempFileName(); // Создаем временный файл
+                try
                 {
-                    await file.CopyToAsync(stream); // Копируем содержимое загруженного файла в поток
+                    // Открываем поток для записи во временный файл
+                    using (var stream = new FileStream(tempFile, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream); // Копируем содержимое загруженного файла во временный файл
+                    }
+
+                    // Импортируем данные из временного файла с помощью сервиса ExcelImporter
+                    var data = _importer.Import(tempFile);
+
+                    // Перебираем все записи, полученные из Excel-файла
+                    foreach (var record in data)
+                    {
+                        try
+                        {
+                            _context.MoscowWeatherData.Add(record); // Добавляем запись в контекст базы данных
+                            await _context.SaveChangesAsync(); // Сохраняем изменения в базе данных
+                        }
+                        catch (DbUpdateException ex)
+                        {
+                            // Обрабатываем исключение, связанное с ошибками при обновлении базы данных
+                            if (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+                            {
+                                // Обрабатываем исключение, связанное с нарушением уникальности ключа
+                                _logger.LogWarning($"Попытка добавить дублирующуюся запись из файла {file.FileName}: {pgEx.Message}");
+                                errorMessages.Add($"Попытка добавить дублирующуюся запись из файла {file.FileName}: {pgEx.Message}");
+                            }
+                            else
+                            {
+                                // Обрабатываем другие исключения, связанные с базой данных
+                                _logger.LogError($"Ошибка при добавлении записи из файла {file.FileName}: {ex.Message}");
+                                errorMessages.Add($"Ошибка при добавлении записи из файла {file.FileName}: {ex.Message}");
+                            }
+
+                            // Отменяем изменения для данной записи, чтобы избежать дальнейших проблем
+                            _context.Entry(record).State = EntityState.Detached;
+                        }
+                        catch (Exception ex)
+                        {
+                            // Обрабатываем другие исключения
+                            _logger.LogError($"Ошибка при добавлении записи из файла {file.FileName}: {ex.Message}");
+                            errorMessages.Add($"Ошибка при добавлении записи из файла {file.FileName}: {ex.Message}");
+
+                            // Отменяем изменения для данной записи, чтобы избежать дальнейших проблем
+                            _context.Entry(record).State = EntityState.Detached;
+                        }
+                    }
                 }
-
-                // Импортируем данные из временного файла
-                var data = _importer.Import(tempFile);
-                allData.AddRange(data); // Добавляем данные в общий список
-
-                // Удаляем временный файл после обработки
-                System.IO.File.Delete(tempFile);
+                catch (Exception ex)
+                {
+                    // Обрабатываем исключения, возникшие при обработке файла
+                    _logger.LogError($"Ошибка при обработке файла {file.FileName}: {ex.Message}");
+                    errorMessages.Add($"Ошибка при обработке файла {file.FileName}: {ex.Message}");
+                }
+                finally
+                {
+                    System.IO.File.Delete(tempFile); // Удаляем временный файл
+                }
             }
 
-            // Сохраняем все данные в базу данных
-            await _context.MoscowWeatherData.AddRangeAsync(allData);
-            await _context.SaveChangesAsync();
+            // Если есть сообщения об ошибках, возвращаем BadRequest с перечислением ошибок
+            if (errorMessages.Any())
+            {
+                //return BadRequest(string.Join("\n", errorMessages));
+            }
 
             // Перенаправляем пользователя на метод Index после успешной загрузки
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
         /// Метод для фильтрации данных по году и месяцу.
+        /// </summary>
         /// <param name="filter">Объект фильтра с параметрами</param>
         /// <returns>Отфильтрованные данные и модель представления</returns>
         [HttpGet]
@@ -77,11 +138,13 @@ namespace NetCore1.Controllers
                 Filter = filter, // Параметры фильтрации
                 Years = _context.MoscowWeatherData.Select(w => w.Date.Year).Distinct().ToList(), // Список доступных лет
                 Months = new List<string> { "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-                                  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь" } // Список месяцев
+                    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь" } // Список месяцев
             });
         }
 
+        /// <summary>
         /// Метод для отображения всех данных о погоде.
+        /// </summary>
         /// <returns>Представление с данными</returns>
         public IActionResult Index()
         {
@@ -89,3 +152,4 @@ namespace NetCore1.Controllers
         }
     }
 }
+
