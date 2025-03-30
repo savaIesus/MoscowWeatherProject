@@ -121,24 +121,30 @@ namespace NetCore1.Controllers
         /// <param name="filter">Объект фильтра с параметрами</param>
         /// <returns>Отфильтрованные данные и модель представления</returns>
         [HttpGet]
-        public IActionResult Filter(WeatherFilter filter)
+        public IActionResult Filter(WeatherFilter filter, int page = 1, int pageSize = 10)
         {
             // Фильтруем данные по году и месяцу, если они указаны в фильтре
-            var data = _context.MoscowWeatherData
+            var query = _context.MoscowWeatherData
                 .Where(w =>
-                    (filter.Year == 0 || w.Date.Year == filter.Year) && // Фильтрация по году
-                    (filter.Month == 0 || w.Date.Month == filter.Month)) // Фильтрация по месяцу
-                .OrderBy(w => w.Date) // Сортировка по дате
-                .ToList();
+                    (filter.Year == 0 || w.Date.Year == filter.Year) &&
+                    (filter.Month == 0 || w.Date.Month == filter.Month))
+                .OrderBy(w => w.Date);
 
-            // Возвращаем модель представления с данными и параметрами фильтрации
+            // Пагинация: вычисляем общее количество страниц и выбираем данные для текущей страницы
+            var totalCount = query.Count();
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            var data = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            // Возвращаем модель представления с данными, фильтром и параметрами пагинации
             return View(new PaginatedArchieveViewModel
             {
-                Data = data, // Отфильтрованные данные
-                Filter = filter, // Параметры фильтрации
-                Years = _context.MoscowWeatherData.Select(w => w.Date.Year).Distinct().ToList(), // Список доступных лет
+                Data = data,
+                Filter = filter,
+                Years = _context.MoscowWeatherData.Select(w => w.Date.Year).Distinct().ToList(),
                 Months = new List<string> { "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-                    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь" } // Список месяцев
+            "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь" },
+                CurrentPage = page,
+                TotalPages = totalPages
             });
         }
 

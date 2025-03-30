@@ -5,20 +5,19 @@
 <div class="row">
     <div class="col-md-6">
         <h4>Фильтр по годам:</h4>
-        <!-- Ссылка для отображения данных за все года -->
         <a asp-action="Filter"
            asp-route-Year="0"
            asp-route-Month="@Model.Filter.Month"
+           asp-route-page="1"
            class="btn btn-outline-primary m-1">
             Все года
         </a>
-        <!-- Цикл для создания ссылок для каждого года -->
         @foreach (var year in Model.Years)
         {
-            <!-- Ссылка для фильтрации данных по конкретному году -->
             <a asp-action="Filter"
                asp-route-Year="@year"
                asp-route-Month="@Model.Filter.Month"
+               asp-route-page="1"
                class="btn @(Model.Filter.Year == year ? "active-filter" : "btn-outline-primary") m-1">
                 @year
             </a>
@@ -27,20 +26,19 @@
 
     <div class="col-md-6">
         <h4>Фильтр по месяцам:</h4>
-        <!-- Ссылка для отображения данных за все месяцы -->
         <a asp-action="Filter"
            asp-route-Year="@Model.Filter.Year"
            asp-route-Month="0"
+           asp-route-page="1"
            class="btn btn-outline-primary m-1">
             Все месяцы
         </a>
-        <!-- Цикл для создания ссылок для каждого месяца -->
         @for (int i = 1; i <= 12; i++)
         {
-            <!-- Ссылка для фильтрации данных по конкретному месяцу -->
             <a asp-action="Filter"
                asp-route-Year="@Model.Filter.Year"
                asp-route-Month="@i"
+               asp-route-page="1"
                class="btn @(Model.Filter.Month == i ? "active-filter" : "btn-outline-primary") m-1">
                 @Model.Months[i - 1]
             </a>
@@ -48,10 +46,8 @@
     </div>
 </div>
 
-<!-- Проверка на наличие данных для отображения -->
 @if (Model.Data.Count == 0)
 {
-    <!-- Сообщение, если данные отсутствуют -->
     <div class="alert alert-info">
         <h4>Нет данных для отображения</h4>
         <p>Выберите год и месяц для фильтрации</p>
@@ -59,7 +55,6 @@
 }
 else
 {
-    <!-- Таблица для отображения данных -->
     <table class="table">
         <thead>
             <tr>
@@ -77,23 +72,136 @@ else
             </tr>
         </thead>
         <tbody>
-            <!-- Цикл для перебора данных и отображения каждой записи -->
             @foreach (var item in Model.Data)
             {
                 <tr>
-                    <td>@item.Date.ToString("dd.MM.yyyy")</td> 
-                    <td>@item.MoscowTime.ToString(@"hh\:mm")</td> 
-                    <td>@item.Temperature.ToString("F1") °C</td> 
+                    <td>@item.Date.ToString("dd.MM.yyyy")</td>
+                    <td>@item.MoscowTime.ToString(@"hh\:mm")</td>
+                    <td>@item.Temperature.ToString("F1") °C</td>
                     <td>@item.Humidity.ToString("F1")%</td>
-                    <td>@item.DewPoint.ToString("F1") °C</td> 
+                    <td>@item.DewPoint.ToString("F1") °C</td>
                     <td>@item.Pressure мм рт.ст.</td>
                     <td>@item.WindDirection @item.WindSpeed м/с</td>
                     <td>@item.Cloudiness</td>
                     <td>@item.H.ToString("F1")</td>
                     <td>@item.VV</td>
-                    <td>@item.WeatherPhenomena</td> 
+                    <td>@item.WeatherPhenomena</td>
                 </tr>
             }
         </tbody>
     </table>
+
+    <!-- Постраничная навигация -->
+    <nav aria-label="Page navigation">
+        <ul class="pagination">
+            @{
+                int maxPagesToShow = 20; // Максимальное количество отображаемых страниц
+                int startPage;
+                int endPage;
+
+                // Вычисляем начальную и конечную страницы
+                if (Model.TotalPages <= maxPagesToShow)
+                {
+                    // Если общее количество страниц меньше или равно максимальному, отображаем все страницы
+                    startPage = 1;
+                    endPage = Model.TotalPages;
+                }
+                else
+                {
+                    // Вычисляем начальную и конечную страницы так, чтобы текущая страница была в центре
+                    int middle = (int)Math.Ceiling(maxPagesToShow / 2.0);
+                    if (Model.CurrentPage <= middle)
+                    {
+                        // Если текущая страница близка к началу
+                        startPage = 1;
+                        endPage = maxPagesToShow;
+                    }
+                    else if (Model.CurrentPage + middle - 1 >= Model.TotalPages)
+                    {
+                        // Если текущая страница близка к концу
+                        startPage = Model.TotalPages - maxPagesToShow + 1;
+                        endPage = Model.TotalPages;
+                    }
+                    else
+                    {
+                        // Если текущая страница где-то посередине
+                        startPage = Model.CurrentPage - middle + 1;
+                        endPage = Model.CurrentPage + middle - (maxPagesToShow % 2 == 0 ? 2 : 1); //Корректировка для четного/нечетного maxPagesToShow
+                    }
+                }
+
+                bool showLeftDots = (startPage > 1);
+                bool showRightDots = (endPage < Model.TotalPages);
+            }
+
+            <!-- Кнопка "Предыдущая" -->
+            @if (Model.CurrentPage > 1)
+            {
+                <li class="page-item">
+                    <a class="page-link" asp-action="Filter"
+                       asp-route-Year="@Model.Filter.Year"
+                       asp-route-Month="@Model.Filter.Month"
+                       asp-route-page="@(Model.CurrentPage - 1)"
+                       aria-label="Previous">
+                        &laquo;
+                    </a>
+                </li>
+            }
+            else
+            {
+                <li class="page-item disabled">
+                    <span class="page-link">&laquo;</span>
+                </li>
+            }
+
+            <!-- Левые точки -->
+            @if (showLeftDots)
+            {
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            }
+
+            <!-- Ссылки на страницы -->
+            @for (int i = startPage; i <= endPage; i++)
+            {
+                <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                    <a class="page-link" asp-action="Filter"
+                       asp-route-Year="@Model.Filter.Year"
+                       asp-route-Month="@Model.Filter.Month"
+                       asp-route-page="@i">
+                        @i
+                    </a>
+                </li>
+            }
+
+            <!-- Правые точки -->
+            @if (showRightDots)
+            {
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            }
+
+            <!-- Кнопка "Следующая" -->
+            @if (Model.CurrentPage < Model.TotalPages)
+            {
+                <li class="page-item">
+                    <a class="page-link" asp-action="Filter"
+                       asp-route-Year="@Model.Filter.Year"
+                       asp-route-Month="@Model.Filter.Month"
+                       asp-route-page="@(Model.CurrentPage + 1)"
+                       aria-label="Next">
+                        &raquo;
+                    </a>
+                </li>
+            }
+            else
+            {
+                <li class="page-item disabled">
+                    <span class="page-link">&raquo;</span>
+                </li>
+            }
+        </ul>
+    </nav>
 }
